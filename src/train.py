@@ -9,6 +9,10 @@ github: https://github.com/mirzaevinom
 """
 
 from config import *
+import model as modellib
+from pycocotools.coco import COCO
+from PIL import Image
+from pycocotools import mask as maskUtils
 
 import h5py
 
@@ -17,7 +21,7 @@ class consid_dataset(utils.Dataset):
     
     
     def load_data(self, dataset_dir, subset, add_subset = None, class_ids=None):
-        from pycocotools.coco import COCO
+        
         
         """Load a subset of the COCO dataset.
         dataset_dir: The root directory of the COCO dataset.
@@ -89,7 +93,7 @@ class consid_dataset(utils.Dataset):
             one mask per instance.
         class_ids: a 1D array of class IDs of the instance masks.
         """
-        from PIL import Image
+        
         # If not a COCO image, delegate to parent class.
         image_info = self.image_info[image_id]
         get_name = image_info['img_name']
@@ -236,7 +240,7 @@ class consid_dataset(utils.Dataset):
         Convert annotation which can be polygons, uncompressed RLE to RLE.
         :return: binary mask (numpy 2D array)
         """
-        from pycocotools import mask as maskUtils
+        
         segm = ann['segmentation']
         if isinstance(segm, list):
             # polygon -- a single object might consist of multiple parts
@@ -256,92 +260,6 @@ class consid_dataset(utils.Dataset):
         Convert annotation which can be polygons, uncompressed RLE, or RLE to binary mask.
         :return: binary mask (numpy 2D array)
         """
-        from pycocotools import mask as maskUtils
         rle = self.annToRLE(ann, height, width)
         m = maskUtils.decode(rle)
         return m
-
-
-
-#if __name__ == '__main__':
-    #import time
-
-
-    #train_path = '../data/stage1_train/'
-
-    #start = time.time()
-
-    '''
-    # initialize training dataset
-    dataset_train = consid_dataset()
-    dataset_train.load_data(train_list, train_path)
-    dataset_train.prepare()
-
-    # initialize validation dataset
-    dataset_val = consid_dataset()
-    dataset_val.load_data(val_list, train_path)
-    dataset_val.prepare()
-
-    # Create model configuration in training mode
-    config = GlobheConfig()
-    config.STEPS_PER_EPOCH = len(train_list)//config.BATCH_SIZE
-    config.VALIDATION_STEPS = len(val_list)//config.BATCH_SIZE
-    config.display()
-    '''
-    '''
-    model = modellib.MaskRCNN(mode="training", config=config,
-                              model_dir=MODEL_DIR)
-
-    # Model weights to start training with
-    init_with = "imagenet"  # imagenet, last, or some pretrained model
-
-    if init_with == "imagenet":
-        weights_path = model.get_imagenet_weights()
-        model.load_weights(weights_path, by_name=True)
-    elif init_with == "coco":
-        # Load weights trained on MS COCO, but skip layers that
-        # are different due to the different number of classes
-        # Local path to trained weights file
-        COCO_MODEL_PATH = 'model/mask_rcnn_coco.h5'
-        # Download COCO trained weights from Releases if needed
-        if not os.path.exists(COCO_MODEL_PATH):
-            utils.download_trained_weights(COCO_MODEL_PATH)
-        # See README for instructions to download the COCO weights
-        model.load_weights(COCO_MODEL_PATH, by_name=True,
-                       exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", 
-                                "mrcnn_bbox", "mrcnn_mask"])
-    elif init_with == "last":
-        # Load the last model you trained and continue training
-        weights_path = model.find_last()[1]
-        model.load_weights(weights_path, by_name=True)
-    elif init_with == "last_":
-        # Load the last model you trained and continue training
-        model.load_weights(model.find_last(), by_name=True)
-    elif init_with == 'pretrained':
-        weights_path = 'model/pretrained_model.h5'
-        model.load_weights(weights_path, by_name=True)
-
-    print('Loading weights from ', weights_path)
-
-    # Train the model for 75 epochs
-
-    model.train(dataset_train, dataset_val,
-                learning_rate=1e-4,
-                epochs=25,
-                verbose=2,
-                layers='all')
-
-    model.train(dataset_train, dataset_val,
-                learning_rate=1e-5,
-                epochs=50,
-                verbose=2,
-                layers='all')
-
-    model.train(dataset_train, dataset_val,
-                learning_rate=1e-6,
-                epochs=75,
-                verbose=2,
-                layers='all')
-    '''
-    #print('Elapsed time', round((time.time() - start)/60, 1), 'minutes')
-

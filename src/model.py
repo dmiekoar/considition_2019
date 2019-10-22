@@ -2964,4 +2964,50 @@ def denorm_boxes_graph(boxes, shape):
     shift = tf.constant([0., 0., 1., 1.])
     return tf.cast(tf.round(tf.multiply(boxes, scale) + shift), tf.int32)
 
+def create_load_model(config, mode, log_dir, init_with = None, model_path = None):
 
+    '''
+    Loads and returns MaskRCNN model for a given config and weights.
+    '''
+    import model as modellib
+    
+    model = modellib.MaskRCNN(mode = mode,
+                              config = config,
+                              model_dir = log_dir)
+    
+    if init_with is not None:
+        print('Initializing model using {} in {} mode.' .format(init_with, mode))
+        
+        if init_with == 'imagenet':
+            weights_path = model.get_imagenet_weights()
+            model.load_weights(weights_path, by_name = True)
+        elif init_with == 'coco':
+            # Load weights trained on MS COCO, but skip layers that
+            # are different due to the different number of classes
+            # Local path to trained weights file
+            COCO_MODEL_PATH = 'model/mask_rcnn_coco.h5'
+            # Download COCO trained weights from Releases if needed
+            if not os.path.exists(COCO_MODEL_PATH):
+                utils.download_trained_weights(COCO_MODEL_PATH)
+            weights_path = COCO_MODEL_PATH
+            # See README for instructions to download the COCO weights
+            model.load_weights(COCO_MODEL_PATH, by_name = True,
+                       exclude = ['mrcnn_class_logits', 'mrcnn_bbox_fc', 
+                                'mrcnn_bbox', 'mrcnn_mask'])
+        elif init_with == 'last':
+            # Load the last model you trained and continue training
+            weights_path = model.find_last()
+            print(weights_path)
+            model.load_weights(weights_path, by_name = True)
+        elif init_with == 'pretrained':
+            weights_path = 'model/pretrained_model.h5'
+            model.load_weights(weights_path, by_name = True)
+            
+    if model_path is not None:
+        weights_path = model_path
+        print('Initializing model using custom weights in {} mode.' .format(mode))
+        model.load_weights(weights_path, by_name = True)
+        
+    print('Loading weights from ', weights_path)
+
+    return model

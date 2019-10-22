@@ -9,7 +9,6 @@ github: https://github.com/mirzaevinom
 """
 from config import *
 from model import log
-from train import train_validation_split, KaggleDataset
 
 import matplotlib.pyplot as plt
 
@@ -25,7 +24,6 @@ import pandas as pd
 from metrics import mean_iou
 from tqdm import tqdm
 
-plt.switch_backend('agg')
 
 
 def rle_encoding(x):
@@ -87,64 +85,34 @@ def plot_boundary(image, true_masks=None, pred_masks=None, ax=None):
     ax.set_aspect(1)  # aspect ratio of 1
 
 
-def plot_train(train_path='../data/stage1_train/'):
+def plot_train(train_path):
     """
     Plot and save true boundaries of nuclei for each training image
     """
 
-    if not os.path.isdir('../train_images'):
-        os.mkdir('../train_images')
+    if not os.path.isdir('train_images'):
+        os.mkdir('train_images')
 
-    df = pd.read_csv('../data/train_df.csv')
+    df = pd.read_csv('data/train_df.csv')
     df = df.set_index('img_id')
 
     train_ids = os.listdir(train_path)
-    dataset_train = KaggleDataset()
-    dataset_train.load_shapes(train_ids, train_path)
+    dataset_train = consid_dataset()
+    dataset_train.load_data(INPUT_DIR, 'train', add_subset = 'Mosaics')
     dataset_train.prepare()
 
     image_ids = dataset_train.image_ids
     for mm, image_id in tqdm(enumerate(image_ids)):
 
-        image = dataset_train.load_image(image_id, color='RGB')
+        image = dataset_train.load_image(image_id)
         masks, class_ids = dataset_train.load_mask(image_id)
         fig = plot_boundary(image, true_masks=masks)
-        fig.savefig('../train_images/train_'+str(mm) +
+        fig.savefig('train_images/train_'+str(mm) +
                     '.png', bbox_inches='tight')
         plt.close()
 
 
-def get_model(config, model_path=None):
 
-    """
-    Loads and returns MaskRCNN model for a given config and weights.
-    """
-    model = modellib.MaskRCNN(mode="inference",
-                              config=config,
-                              model_dir=MODEL_DIR)
-
-    # Get path to saved weights
-    # Either set a specific path or find last trained weights
-    # model_path = os.path.join(ROOT_DIR, ".h5 file name here")
-    if model_path is None:
-        model_path = model.find_last()[1]
-        try:
-            os.rename(model_path, model_path)
-            print('Access on file ' + model_path + ' is available!')
-            from shutil import copyfile
-            dst = '../data/mask_rcnn_temp.h5'
-            copyfile(model_path, dst)
-            model_path = dst
-        except OSError as e:
-            print('Access-error on file "' + model_path + '"! \n' + str(e))
-
-    # Load trained weights (fill in path to trained weights here)
-    assert model_path != "", "Provide path to trained weights"
-    print("Loading weights from ", model_path)
-
-    model.load_weights(model_path, by_name=True)
-
-    return model
 
 
 def ensemble_prediction(model, config, image):
@@ -347,7 +315,6 @@ def eval_n_plot_val(model, config, dataset_val, save_plots=False):
 def pred_n_plot_test(model, config, test_path='../data/stage2_test_final/', save_plots=False):
     """
     Predicts nuclei for each image, draws the boundaries and saves in images folder.
-
     """
     # Create images folder if doesn't exist.
     if not os.path.isdir('../images'):
@@ -416,7 +383,7 @@ def pred_n_plot_test(model, config, test_path='../data/stage2_test_final/', save
 
     print('Number of rows:', len(sub))
     print('No mask prediction for', no_masks, 'images')
-
+'''
 
 if __name__ == '__main__':
 
@@ -425,45 +392,34 @@ if __name__ == '__main__':
     start = time.time()
 
     # Create model configuration in inference mode
-    config = KaggleBowlConfig()
+    config = InferenceConfig()
     config.GPU_COUNT = 1
     config.IMAGES_PER_GPU = 1
     config.BATCH_SIZE = 1
     config.display()
 
     # Predict using the last weights in training directory
-    model = get_model(config)
+    model = create_load_model(config, mode = 'inference', log_dir, init_with = 'last', model_path = None)
 
     # Predict using pre-trained weights
-    # model = get_model(config, model_path='../data/kaggle_bowl.h5')
+    # model = create_load_model(config, mode = 'inference', log_dir, init_with = None, model_path = '...')
 
 
-    # Ininitialize validation dataset
-    train_path = '../data/stage1_train/'
-    train_list, val_list = train_validation_split(
-        train_path, seed=11, test_size=0.1)
-    dataset_val = KaggleDataset()
-    dataset_val.load_shapes(val_list, train_path)
-    dataset_val.prepare()
+    # Initialize validation dataset
+    val_set = consid_dataset()
+    val_set.load_data(INPUT_DIR, 'validation')
+    val_set.prepare()
 
-    # initialize stage 1  testing dataset
-    dataset_val = KaggleDataset()
-    val_path = '../data/stage1_test/'
-    val_list = os.listdir(val_path)
-    dataset_val.load_shapes(val_list, val_path)
-    dataset_val.prepare()
+    # initialize test dataset
+    test_set = consid_dataset()
+    test_set.load_data(INPUT_DIR, 'test')
+    test_set.prepare()
+    
     # Evaluate the model performance and plot boundaries for the predictions
     eval_n_plot_val(model, config, dataset_val, save_plots=True)
 
     # Predict and plot boundaries for stage1 test
-    pred_n_plot_test(model, config, test_path='../data/stage1_test/', save_plots=True)
-    # Predict and plot boundaries for stage2 test
-    pred_n_plot_test(model, config, test_path='../data/stage2_test_final/', save_plots=True)
-
-    # Save supercomputer log file locally
-    if 'PBS_JOBID' in os.environ.keys():
-        job_id = os.environ['PBS_JOBID'][:7]
-        fileList = list(filter(lambda x: job_id in x, os.listdir('./')))
-        os.rename(fileList[0], 'log.txt')
+    pred_n_plot_test(model, config, test_path = 'data/stage1_test/', save_plots=True)
 
     print('Elapsed time', round((time.time() - start)/60, 1), 'minutes')
+'''

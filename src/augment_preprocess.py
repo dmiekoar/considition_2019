@@ -755,3 +755,21 @@ def create_separate_mask(mask_file, category_id):
     
     return final_mask, class_ids
 
+def augmentation_pipeline():
+    
+    import imgaug as ia
+    from imgaug import augmenters as iaa
+    
+    augmentation = iaa.SomeOf((0,4), [
+    iaa.Fliplr(0.5),
+    iaa.Flipud(0.5),
+    iaa.Sharpen((0.0, 1.0)),       
+    iaa.Affine(scale={"x": (0.6, 3), "y": (0.6, 3)},translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},rotate=(-30, 30),shear=(-8, 8)),
+    iaa.Sequential([
+        iaa.Multiply((0.8, 1.2)),
+        iaa.Grayscale(alpha=(0.7, 1)),
+        iaa.GaussianBlur(sigma=(13)),
+        iaa.Canny(alpha=(0.4), sobel_kernel_size=[5, 5], random_state = 42,colorizer = iaa.RandomColorsBinaryImageColorizer(color_true= 255, color_false= 0))   
+    ], random_order = False)])
+    
+    return augmentation

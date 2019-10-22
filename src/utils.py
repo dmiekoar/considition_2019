@@ -29,6 +29,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import itertools
 import colorsys
+import model as modellib
+from model import *
 
 
 
@@ -795,6 +797,23 @@ def compute_ap_range(gt_box, gt_class_id, gt_mask,
         print("AP @{:.2f}-{:.2f}:\t {:.3f}".format(
             iou_thresholds[0], iou_thresholds[-1], AP))
     return AP
+
+def compute_batch_ap(image_ids, dataset, config, model):
+    APs = []
+    for image_id in image_ids:
+        # Load image
+        image, image_meta, gt_class_id, gt_bbox, gt_mask =\
+            modellib.load_image_gt(dataset, config,
+                                   image_id, use_mini_mask=False)
+        # Run object detection
+        results = model.detect([image], verbose=0)
+        # Compute AP
+        r = results[0]
+        AP, precisions, recalls, overlaps =\
+            compute_ap(gt_bbox, gt_class_id, gt_mask,
+                              r['rois'], r['class_ids'], r['scores'], r['masks'])
+        APs.append(AP)
+    return APs
 
 
 def compute_recall(pred_boxes, gt_boxes, iou):
